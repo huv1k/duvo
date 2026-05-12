@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "setup": "bun install",
+    "setup": "bun install && root=\"$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')\" && if [ -n \"$root\" ] && [ \"$root\" != \"$PWD\" ] && [ -f \"$root/.env.local\" ] && [ ! -f .env.local ]; then cp \"$root/.env.local\" .env.local && echo \"Copied .env.local from $root\"; fi",
     "run": "bun run dev -- --port $CONDUCTOR_PORT"
   }
 }
