@@ -13,7 +13,21 @@ const ALLOWED_TOOLS = [
   "mcp__files__save_csv",
 ];
 
-const APPEND_SYSTEM_PROMPT = `You can use WebSearch and WebFetch to gather the latest AI news from the web. When the user asks for AI news as a CSV, extract for each article: title, date (ISO 8601 if possible), a short excerpt, and the article link. Then call the \`save_csv\` tool (full name \`mcp__files__save_csv\`) with \`{ filename, rows: [{title, date, excerpt, link}] }\`. The tool returns a JSON object with a \`url\` and \`filename\`. End your final reply with a single Markdown link of the form \`[Download <filename>](<url>)\` using exactly the URL the tool returned.`;
+const APPEND_SYSTEM_PROMPT = `You can use WebSearch and WebFetch to gather the latest AI news from the web. When the user asks for AI news as a CSV, extract for each article: title, date (ISO 8601 if possible), a short excerpt, and the article link. Then call the \`save_csv\` tool (full name \`mcp__files__save_csv\`) with \`{ filename, rows: [{title, date, excerpt, link}] }\`. The tool returns a JSON object with a \`url\` and \`filename\`. Include a single Markdown link of the form \`[Download <filename>](<url>)\` using exactly the URL the tool returned.
+
+Before ending the run, evaluate your own work against the user's original task. Your final reply MUST end with a fenced code block tagged \`evaluation\` containing JSON with this exact shape:
+
+\`\`\`evaluation
+{
+  "success": true,
+  "summary": "<one-sentence verdict>",
+  "criteria": [
+    { "name": "<what you checked>", "passed": true, "note": "<short evidence>" }
+  ]
+}
+\`\`\`
+
+Derive \`criteria\` from the user's task (e.g. "CSV produced", "all required columns present", "rows match the requested topic", "download link uses the URL returned by save_csv"). Verify each criterion against the artifacts you actually produced — re-read the relevant tool results, and follow the download URL with \`WebFetch\` if you need to inspect file contents. Set \`success: false\` if any criterion fails, and explain in \`summary\`. The evaluation block must be the very last thing in your reply.`;
 
 export async function POST(request: Request) {
   let prompt: string;
