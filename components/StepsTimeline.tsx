@@ -7,6 +7,7 @@ import {
   type Step,
   type StreamMessage,
 } from "@/lib/steps";
+import { parseEvaluation, type Evaluation } from "@/lib/evaluation";
 import { renderInline } from "@/lib/render";
 
 type Props = {
@@ -27,6 +28,8 @@ export function StepsTimeline({
   const steps = deriveSteps(messages, running);
   const result = findResultMessage(messages);
   const error = findErrorMessage(messages);
+  const { evaluation, cleanedText } = parseEvaluation(result?.result);
+  const evaluationFailed = !!evaluation && !evaluation.success;
 
   return (
     <div className="flex flex-col gap-4">
@@ -40,7 +43,10 @@ export function StepsTimeline({
               {prompt}
             </div>
           </div>
-          <RunStatusPill running={running} hasError={!!error || !!result?.is_error} />
+          <RunStatusPill
+            running={running}
+            hasError={!!error || !!result?.is_error || evaluationFailed}
+          />
         </div>
         <div className="flex gap-2">
           {running ? (
@@ -80,7 +86,13 @@ export function StepsTimeline({
         </ol>
       )}
 
-      {result && <ResultFooter result={result} />}
+      {result && (
+        <ResultFooter
+          result={result}
+          cleanedText={cleanedText}
+          evaluation={evaluation}
+        />
+      )}
       {error && (
         <div className="rounded-lg border border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950 p-3 text-sm text-red-900 dark:text-red-200">
           {error.error}
@@ -203,30 +215,99 @@ function StepStatusLabel({ status }: { status: Step["status"] }) {
 
 function ResultFooter({
   result,
+  cleanedText,
+  evaluation,
 }: {
   result: { result?: string; is_error?: boolean; total_cost_usd?: number; duration_ms?: number; num_turns?: number };
+  cleanedText: string;
+  evaluation: Evaluation | null;
 }) {
+  const failed = result.is_error || (evaluation ? !evaluation.success : false);
+  const text = cleanedText || result.result || "";
+  return (
+    <div className="flex flex-col gap-3">
+      <div
+        className={`rounded-lg border p-3 ${
+          failed
+            ? "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950"
+            : "border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950"
+        }`}
+      >
+        <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
+          Result
+        </div>
+        {text && (
+          <div className="text-sm text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
+            {renderInline(text)}
+          </div>
+        )}
+        <div className="mt-2 text-xs text-zinc-500">
+          {result.num_turns != null && <>{result.num_turns} turns · </>}
+          {result.duration_ms != null && <>{(result.duration_ms / 1000).toFixed(1)}s · </>}
+          {result.total_cost_usd != null && <>${result.total_cost_usd.toFixed(4)}</>}
+        </div>
+      </div>
+      {evaluation && <EvaluationCard evaluation={evaluation} />}
+    </div>
+  );
+}
+
+function EvaluationCard({ evaluation }: { evaluation: Evaluation }) {
+  const passed = evaluation.success;
   return (
     <div
       className={`rounded-lg border p-3 ${
-        result.is_error
-          ? "border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950"
-          : "border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950"
+        passed
+          ? "border-emerald-300 bg-white dark:border-emerald-900 dark:bg-zinc-900"
+          : "border-red-300 bg-white dark:border-red-900 dark:bg-zinc-900"
       }`}
     >
-      <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2">
-        Result
-      </div>
-      {result.result && (
-        <div className="text-sm text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
-          {renderInline(result.result)}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+          Evaluation
         </div>
-      )}
-      <div className="mt-2 text-xs text-zinc-500">
-        {result.num_turns != null && <>{result.num_turns} turns · </>}
-        {result.duration_ms != null && <>{(result.duration_ms / 1000).toFixed(1)}s · </>}
-        {result.total_cost_usd != null && <>${result.total_cost_usd.toFixed(4)}</>}
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2 h-5 text-[11px] ${
+            passed
+              ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+              : "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              passed ? "bg-emerald-500" : "bg-red-500"
+            }`}
+          />
+          {passed ? "Passed" : "Failed"}
+        </span>
       </div>
+      <div className="text-sm text-zinc-900 dark:text-zinc-100 mb-3">
+        {evaluation.summary}
+      </div>
+      {evaluation.criteria.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {evaluation.criteria.map((c, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs">
+              <span
+                className={`mt-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full text-[10px] font-bold ${
+                  c.passed
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                    : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                }`}
+                aria-hidden
+              >
+                {c.passed ? "✓" : "✕"}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-zinc-900 dark:text-zinc-100">{c.name}</div>
+                {c.note && (
+                  <div className="text-zinc-500 dark:text-zinc-400">{c.note}</div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
