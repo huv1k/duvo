@@ -1,10 +1,19 @@
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import {
+  query,
+  type ElicitationRequest,
+  type ElicitationResult,
+  type SDKMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import { saveCsvServer } from "../../lib/save-csv-tool";
+import {
+  getEnabledServerConfigs,
+  getEnabledServerNames,
+} from "../../lib/mcp-store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const ALLOWED_TOOLS = [
+const BASE_TOOLS = [
   "Read",
   "Grep",
   "Glob",
@@ -58,14 +67,36 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(msg)}\n\n`));
       };
 
+      const onElicitation = async (
+        request: ElicitationRequest,
+      ): Promise<ElicitationResult> => {
+        if (request.mode === "url" && request.url) {
+          send({
+            type: "auth_required",
+            serverName: request.serverName,
+            url: request.url,
+            elicitationId: request.elicitationId,
+            message: request.message,
+          });
+          return { action: "accept" };
+        }
+        return { action: "decline" };
+      };
+
       try {
+        const userServers = getEnabledServerConfigs();
+        const allowedTools = [
+          ...BASE_TOOLS,
+          ...getEnabledServerNames().map((n) => `mcp__${n}`),
+        ];
         const iterator = query({
           prompt,
           options: {
             cwd: process.cwd(),
-            tools: ALLOWED_TOOLS,
-            allowedTools: ALLOWED_TOOLS,
-            mcpServers: { files: saveCsvServer },
+            tools: allowedTools,
+            allowedTools,
+            mcpServers: { files: saveCsvServer, ...userServers },
+            onElicitation,
             systemPrompt: {
               type: "preset",
               preset: "claude_code",

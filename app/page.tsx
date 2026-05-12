@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { StepsTimeline } from "@/components/StepsTimeline";
 import type { StreamMessage } from "@/lib/steps";
@@ -88,15 +89,23 @@ export default function Home() {
   return (
     <div className="min-h-full flex flex-col bg-zinc-50 dark:bg-black font-sans">
       <main className="flex-1 w-full max-w-3xl mx-auto px-6 py-12 flex flex-col gap-6">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Agentic Automation
-          </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {view === "compose"
-              ? "Write instructions. Claude runs them with read-only tools."
-              : "Live progress of the automation run."}
-          </p>
+        <header className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              Agentic Automation
+            </h1>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {view === "compose"
+                ? "Write instructions. Claude runs them with read-only tools."
+                : "Live progress of the automation run."}
+            </p>
+          </div>
+          <Link
+            href="/settings/mcp-servers"
+            className="text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-full border border-zinc-200 dark:border-zinc-800 px-3 h-8 inline-flex items-center whitespace-nowrap"
+          >
+            + Add MCP server
+          </Link>
         </header>
 
         {view === "compose" ? (

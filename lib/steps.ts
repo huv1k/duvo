@@ -48,6 +48,19 @@ export type ResultMessage = {
   num_turns?: number;
 };
 export type ErrorMessage = { type: "error"; error: string };
+export type AuthRequiredMessage = {
+  type: "auth_required";
+  serverName: string;
+  url: string;
+  elicitationId?: string;
+  message?: string;
+};
+export type SystemMessage = {
+  type: "system";
+  subtype?: string;
+  mcp_server_name?: string;
+  elicitation_id?: string;
+};
 export type OtherMessage = { type: string };
 
 export type StreamMessage =
@@ -55,7 +68,43 @@ export type StreamMessage =
   | UserMessage
   | ResultMessage
   | ErrorMessage
+  | AuthRequiredMessage
+  | SystemMessage
   | OtherMessage;
+
+export type AuthPrompt = {
+  serverName: string;
+  url: string;
+  elicitationId?: string;
+  message?: string;
+  resolved: boolean;
+};
+
+export function deriveAuthPrompts(messages: StreamMessage[]): AuthPrompt[] {
+  const resolved = new Set<string>();
+  for (const m of messages) {
+    if (
+      m.type === "system" &&
+      (m as SystemMessage).subtype === "elicitation_complete"
+    ) {
+      const id = (m as SystemMessage).elicitation_id;
+      if (id) resolved.add(id);
+    }
+  }
+  const prompts: AuthPrompt[] = [];
+  for (const m of messages) {
+    if (m.type !== "auth_required") continue;
+    const a = m as AuthRequiredMessage;
+    prompts.push({
+      serverName: a.serverName,
+      url: a.url,
+      elicitationId: a.elicitationId,
+      message: a.message,
+      resolved: a.elicitationId ? resolved.has(a.elicitationId) : false,
+    });
+  }
+  return prompts;
+}
 
 export function summarizeInput(input: unknown): string {
   if (!input || typeof input !== "object") return "";
