@@ -7,6 +7,7 @@ import {
   type Step,
   type StreamMessage,
 } from "@/lib/steps";
+import { renderInline } from "@/lib/render";
 
 type Props = {
   messages: StreamMessage[];
@@ -218,7 +219,7 @@ function ResultFooter({
       </div>
       {result.result && (
         <div className="text-sm text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap">
-          {result.result}
+          {renderInline(result.result)}
         </div>
       )}
       <div className="mt-2 text-xs text-zinc-500">

@@ -1,9 +1,19 @@
 import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { saveCsvServer } from "../../lib/save-csv-tool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "WebFetch"];
+const ALLOWED_TOOLS = [
+  "Read",
+  "Grep",
+  "Glob",
+  "WebFetch",
+  "WebSearch",
+  "mcp__files__save_csv",
+];
+
+const APPEND_SYSTEM_PROMPT = `You can use WebSearch and WebFetch to gather the latest AI news from the web. When the user asks for AI news as a CSV, extract for each article: title, date (ISO 8601 if possible), a short excerpt, and the article link. Then call the \`save_csv\` tool (full name \`mcp__files__save_csv\`) with \`{ filename, rows: [{title, date, excerpt, link}] }\`. The tool returns a JSON object with a \`url\` and \`filename\`. End your final reply with a single Markdown link of the form \`[Download <filename>](<url>)\` using exactly the URL the tool returned.`;
 
 export async function POST(request: Request) {
   let prompt: string;
@@ -39,8 +49,14 @@ export async function POST(request: Request) {
           prompt,
           options: {
             cwd: process.cwd(),
-            tools: READ_ONLY_TOOLS,
-            allowedTools: READ_ONLY_TOOLS,
+            tools: ALLOWED_TOOLS,
+            allowedTools: ALLOWED_TOOLS,
+            mcpServers: { files: saveCsvServer },
+            systemPrompt: {
+              type: "preset",
+              preset: "claude_code",
+              append: APPEND_SYSTEM_PROMPT,
+            },
             model: "claude-sonnet-4-6",
             permissionMode: "default",
             abortController,
