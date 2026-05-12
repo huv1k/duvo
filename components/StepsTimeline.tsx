@@ -1,9 +1,11 @@
 "use client";
 
 import {
+  deriveAuthPrompts,
   deriveSteps,
   findErrorMessage,
   findResultMessage,
+  type AuthPrompt,
   type Step,
   type StreamMessage,
 } from "@/lib/steps";
@@ -26,6 +28,7 @@ export function StepsTimeline({
   onReset,
 }: Props) {
   const steps = deriveSteps(messages, running);
+  const authPrompts = deriveAuthPrompts(messages);
   const result = findResultMessage(messages);
   const error = findErrorMessage(messages);
   const { evaluation, cleanedText } = parseEvaluation(result?.result);
@@ -69,6 +72,14 @@ export function StepsTimeline({
           </span>
         </div>
       </header>
+
+      {authPrompts.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {authPrompts.map((p, i) => (
+            <AuthPromptCard key={p.elicitationId ?? i} prompt={p} />
+          ))}
+        </div>
+      )}
 
       {steps.length === 0 ? (
         <div className="rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-sm text-zinc-500 text-center">
@@ -307,6 +318,38 @@ function EvaluationCard({ evaluation }: { evaluation: Evaluation }) {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+function AuthPromptCard({ prompt }: { prompt: AuthPrompt }) {
+  return (
+    <div
+      className={`rounded-lg border p-3 flex items-start gap-3 ${
+        prompt.resolved
+          ? "border-emerald-300 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950"
+          : "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950"
+      }`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">
+          {prompt.resolved ? "Authorized" : "Authorization required"}
+        </div>
+        <div className="text-sm text-zinc-900 dark:text-zinc-100">
+          <span className="font-mono">{prompt.serverName}</span>
+          {prompt.message ? ` — ${prompt.message}` : ""}
+        </div>
+      </div>
+      {!prompt.resolved && (
+        <a
+          href={prompt.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded-full bg-zinc-900 dark:bg-zinc-50 text-zinc-50 dark:text-zinc-900 px-4 h-8 inline-flex items-center text-xs font-medium whitespace-nowrap"
+        >
+          Authorize ↗
+        </a>
       )}
     </div>
   );
